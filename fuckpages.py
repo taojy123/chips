@@ -24,7 +24,7 @@ def fuck():
     counter -= 1
     
 
-for i in range(10):
+for i in range(6*24*7):
     _thread.start_new_thread(fuck, ())
     time.sleep(10)
 
