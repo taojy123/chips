@@ -1,9 +1,11 @@
 #!/bin/python
 
 import os
+import sys
 import datetime
 import paramiko
 import pymysql
+import hashlib
 
 
 client = paramiko.Transport(('10.11.73.11', 22))
@@ -61,29 +63,73 @@ cursor = conn.cursor()
 
 for fname in os.listdir(today_dir):
 
-    yesterday = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime('%Y%m%d')
-
-    assert yesterday in fname, (yesterday, fname)
-
-    tname = fname.replace('_' + yesterday, '')
-
-    if tname.startswith('check_'):
+    if fname.startswith('check_'):
         continue
 
-    print(tname)
-    if tname not in ['loan_daily']:
+    if '_' not in fname:
+        continue
+
+    if '.' in fname:
+        continue
+
+    tname = fname[:-9]
+
+    print(fname, tname)
+
+    if tname not in [
+            #'accounting',
+            'daily_balance',
+            'exempt_instmnt_detail',
+            'exempt_loan_detail',
+            'instmnt_daily',
+            'loan_calc',
+            'loan_daily',
+            'loan_detail',
+            'repay_instmnt_detail',
+            'repay_loan_detail',
+            'repay_plan',
+        ]:
         print('skip')
         continue
 
-    fpath = os.path.join(today_dir, fname)
-    lines = open(fpath).read().strip().splitlines()
+    sql = "select count(*) from import_history where fname='%s';" % fname
+    print(sql)
+    cursor.execute(sql)
+    r = cursor.fetchone()
+    count = r[0]
+    if count > 0:
+        print('exists!')
+        continue
 
-    fields = lines[0].split(',')
+    fpath = os.path.join(today_dir, fname)
+    lines = open(fpath).readlines()
+
+    fields = lines[0].strip().split(',')
+    # fields.append('remark')
     fieldstr = ', '.join(fields)
 
+    num = 0
     for line in lines[1:]:
 
+        line = line.strip()
+        if not line:
+            continue
+
+        num += 1
+        # remark = '%s:%s:%d' % (fname, num, line)
+        # remark = hashlib.md5(remark.encode()).hexdigest()
+
+        # sql = "select count(*) from %s where remark='%s';" % (tname, remark) 
+        # print(sql)
+        # cursor.execute(sql)
+        # r = cursor.fetchone()
+        # count = r[0]
+        # if count > 0:
+        #     print('exists')
+        #     continue
+
         values = line.split(',')
+        # values.append(remark)
         valuestr = "', '".join(values)
         valuestr = "'" + valuestr + "'"
 
@@ -91,7 +137,11 @@ for fname in os.listdir(today_dir):
         print(sql)
         cursor.execute(sql)
 
-cursor.execute('commit;')
+    sql = "insert into import_history (fname) values ('%s');" % fname 
+    print(sql)
+    cursor.execute(sql)
+    cursor.execute('commit;')
+
 cursor.close()
 conn.close()
 
