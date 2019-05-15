@@ -1,6 +1,4 @@
-print('------------------------------22222222222222---------------')
 from celery.schedules import crontab
-
 
 broker_url = 'redis://127.0.0.1:6379/2'
 result_backend = 'redis://127.0.0.1:6379/3'
@@ -18,8 +16,8 @@ beat_schedule = {
 	'fetch': {
 		'task': 'jiebei_task.fetch',
 		'args': (),
-		'schedule': crontab(minute='*/2'),
-		# 'schedule': crontab(minute=1, hour='*/6'),
+		# 'schedule': crontab(minute='*/2'),
+		'schedule': crontab(minute=1, hour='*/6'),
 	}
 }
 

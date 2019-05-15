@@ -7,7 +7,7 @@ import paramiko
 import pymysql
 import hashlib
 from celery import Celery
-print ('============================11111111111111======================11')
+
 
 app = Celery('jiebei')
 app.config_from_object('celeryconfig')
@@ -80,22 +80,6 @@ def fetch(is_all=False):
             if count > 0:
                 print('exists!')
                 continue
-
-            # if tname not in [
-            #         #'accounting',
-            #         'daily_balance',
-            #         'exempt_instmnt_detail',
-            #         'exempt_loan_detail',
-            #         'instmnt_daily',
-            #         'loan_calc',
-            #         'loan_daily',
-            #         'loan_detail',
-            #         'repay_instmnt_detail',
-            #         'repay_loan_detail',
-            #         'repay_plan',
-            #     ]:
-            #     print('skip')
-            #     continue
 
             fpath = os.path.join(today_dir, fname)
             lines = open(fpath).readlines()
@@ -170,5 +154,9 @@ if __name__ == '__main__':
         fetch(is_all=True)
     else:
         fetch()
+
+# celery multi start w1 -A jiebei_task -B --concurrency=1
+# flower -A jiebei_task --address=0.0.0.0
+
 
 
