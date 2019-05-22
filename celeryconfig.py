@@ -17,7 +17,7 @@ beat_schedule = {
 		'task': 'jiebei_task.fetch',
 		'args': (),
 		# 'schedule': crontab(minute='*/2'),
-		'schedule': crontab(minute=1, hour='*/6'),
+		'schedule': crontab(minute=1, hour='*/8'),
 	}
 }
 

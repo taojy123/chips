@@ -9,6 +9,9 @@ import hashlib
 from celery import Celery
 
 
+SECRET_FIELDS = ['cert_no']
+
+
 app = Celery('jiebei')
 app.config_from_object('celeryconfig')
 
@@ -23,14 +26,12 @@ def fetch(is_all=False):
     conn =  pymysql.connect(host="172.23.43.13", port=3307, user="tjy", password='tjy', database='jiebei', charset='utf8')
     cursor = conn.cursor()
 
-    counter = 0
+    total_counter = 0
 
     if is_all:
         days = sftp.listdir('./kunlunjiebei')
         days = sorted(days)
-        # ['20190505', '20190504', '20190426', '20190510', '20190513', '20190501', '20190512', '20190511', 
-        # '20190427', '20190425', '20190506', '20190502', '20190503', '20190430', '20190514', '20190429', 
-        # '20190428', '20190509', '20190507', '20190508']
+        # ['20190505', '20190506', '20190510', ...]
     else:
         today = datetime.datetime.now().strftime('%Y%m%d')
         days = [today]
@@ -38,12 +39,19 @@ def fetch(is_all=False):
     for today in days:
 
         print('today is', today)
-        assert today in sftp.listdir('./kunlunjiebei'), 'data of %s not found!' % today
+        if today not in sftp.listdir('./kunlunjiebei'):
+            result = 'data of %s not found!' % today
+            return result
 
-        sftp.get('./kunlunjiebei/%s/%s.tar.Z' % (today, today), '/usr/local/data/checkpoint/jiebei/%s.tar.Z' % today)
+        checkpoint_filename = '/usr/local/data/checkpoint/jiebei/%s.tar.Z' % today
+        sftp.get('./kunlunjiebei/%s/%s.tar.Z' % (today, today), checkpoint_filename)
+        cmd = 'python /home/taojiayuan/workspace/clam/clam.py --encrypt --in %s --key=/root/abc.txt' % checkpoint_filename
+        os.system(cmd)
+        os.remove(checkpoint_filename)
+
         print('save to checkpoint success!')
 
-        today_dir = '/home/taojiayuan/workspace/%s' % today
+        today_dir = '/home/taojiayuan/workspace/jiebeitmp/%s' % today
 
         if not os.path.exists(today_dir):
             os.makedirs(today_dir)
@@ -83,6 +91,7 @@ def fetch(is_all=False):
 
             fpath = os.path.join(today_dir, fname)
             lines = open(fpath).readlines()
+            counter = 0
 
             if tname == 'accounting':
                 fields = []
@@ -106,9 +115,14 @@ def fetch(is_all=False):
 
             else:
 
-
                 fields = lines[0].strip().split(',')
                 fieldstr = ', '.join(fields)
+
+                secret_indexs = []
+                for secret_field in SECRET_FIELDS:
+                    if secret_field in fields:
+                        index = fields.index(secret_field)
+                        secret_indexs.append(index)
 
                 for line in lines[1:]:
 
@@ -117,6 +131,12 @@ def fetch(is_all=False):
                         continue
 
                     values = line.split(',')
+
+                    for secret_index in secret_indexs:
+                        value = values[secret_index]
+                        secret_value = hashlib.md5(value.encode()).hexdigest()
+                        values[secret_index] = secret_value
+
                     valuestr = "', '".join(values)
                     valuestr = "'" + valuestr + "'"
 
@@ -125,10 +145,11 @@ def fetch(is_all=False):
                     cursor.execute(sql)
                     counter += 1
 
-            sql = "insert into import_history (fname) values ('%s');" % fname 
+            sql = "insert into import_history (fname, count) values ('%s', %d);" % (fname, counter) 
             print(sql)
             cursor.execute(sql)
             cursor.execute('commit;')
+            total_counter += counter
 
         print('upload to mysql success!')
 
@@ -137,8 +158,8 @@ def fetch(is_all=False):
     cursor.close()
     conn.close()
 
-    if counter:
-        result = 'import %d records successful!' % counter
+    if total_counter:
+        result = 'import %d records successful!' % total_counter
     else:
         result = 'No records need to be imported'
 
@@ -157,6 +178,6 @@ if __name__ == '__main__':
 
 # celery multi start w1 -A jiebei_task -B --concurrency=1
 # flower -A jiebei_task --address=0.0.0.0
-
+# nohup flower -A jiebei_task --address=0.0.0.0 > /dev/null 2>&1 &
 
 
