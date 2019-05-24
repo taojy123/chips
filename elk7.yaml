@@ -1,0 +1,384 @@
+apiVersion: v1
+items:
+- apiVersion: v1
+  data:
+    fluent-bit.conf: |-
+      [SERVICE]
+          Flush        1
+          Daemon       Off
+          Log_Level    info
+          Parsers_File parsers.conf
+
+      [INPUT]
+          Name             tail
+          Path             /var/log/containers/*.log
+          Parser           docker
+          Tag              kube.*
+          Refresh_Interval 5
+          Mem_Buf_Limit    5MB
+          Skip_Long_Lines  On
+
+      [FILTER]
+          Name                kubernetes
+          Match               kube.*
+          Kube_URL            https://kubernetes.default.svc:443
+          Kube_CA_File        /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+          Kube_Token_File     /var/run/secrets/kubernetes.io/serviceaccount/token
+
+      [OUTPUT]
+          Name  es
+          Match *
+          Host  elasticsearch
+          Port  9200
+          Logstash_Format On
+          Retry_Limit False
+          Type  flb_type
+          Logstash_Prefix kubernetes_cluster
+    parsers.conf: ""
+  kind: ConfigMap
+  metadata:
+    annotations:
+      field.cattle.io/creatorId: user-pqsxq
+    creationTimestamp: 2019-05-24T04:54:53Z
+    labels:
+      app: efk-fluent-bit
+      cattle.io/creator: norman
+      io.cattle.field/appId: efk
+    name: fluent-bit-config
+    namespace: elk
+    resourceVersion: "981222"
+    selfLink: /api/v1/namespaces/elk/configmaps/fluent-bit-config
+    uid: 11a9c62d-7de0-11e9-a691-005056b887a4
+- apiVersion: extensions/v1beta1
+  kind: Deployment
+  metadata:
+    annotations:
+      deployment.kubernetes.io/revision: "4"
+      field.cattle.io/creatorId: user-pqsxq
+      field.cattle.io/publicEndpoints: '[{"addresses":["172.23.43.15"],"port":30561,"protocol":"TCP","serviceName":"elk:kibana-nodeport","allNodes":true}]'
+    creationTimestamp: 2019-05-24T03:57:32Z
+    generation: 7
+    labels:
+      cattle.io/creator: norman
+      workload.user.cattle.io/workloadselector: deployment-elk-kibana
+    name: kibana
+    namespace: elk
+    resourceVersion: "980146"
+    selfLink: /apis/extensions/v1beta1/namespaces/elk/deployments/kibana
+    uid: 0e7ea429-7dd8-11e9-a691-005056b887a4
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        workload.user.cattle.io/workloadselector: deployment-elk-kibana
+    strategy:
+      rollingUpdate:
+        maxSurge: 1
+        maxUnavailable: 0
+      type: RollingUpdate
+    template:
+      metadata:
+        annotations:
+          cattle.io/timestamp: 2019-05-24T05:17:22Z
+          field.cattle.io/ports: '[[{"containerPort":5601,"dnsName":"kibana-nodeport","kind":"NodePort","name":"5601tcp305611","protocol":"TCP","sourcePort":30561}]]'
+        creationTimestamp: null
+        labels:
+          workload.user.cattle.io/workloadselector: deployment-elk-kibana
+      spec:
+        containers:
+        - env:
+          - name: ELASTICSEARCH_HOSTS
+            value: http://172.23.43.15:32425
+          image: docker.elastic.co/kibana/kibana:7.1.0
+          imagePullPolicy: Always
+          name: kibana
+          ports:
+          - containerPort: 5601
+            name: 5601tcp305611
+            protocol: TCP
+          resources: {}
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
+            procMount: Default
+            readOnlyRootFilesystem: false
+            runAsNonRoot: false
+          stdin: true
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          tty: true
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext: {}
+        terminationGracePeriodSeconds: 30
+  status:
+    availableReplicas: 1
+    conditions:
+    - lastTransitionTime: 2019-05-24T03:57:32Z
+      lastUpdateTime: 2019-05-24T05:17:25Z
+      message: ReplicaSet "kibana-867bcff8b6" has successfully progressed.
+      reason: NewReplicaSetAvailable
+      status: "True"
+      type: Progressing
+    - lastTransitionTime: 2019-05-24T05:24:04Z
+      lastUpdateTime: 2019-05-24T05:24:04Z
+      message: Deployment has minimum availability.
+      reason: MinimumReplicasAvailable
+      status: "True"
+      type: Available
+    observedGeneration: 7
+    readyReplicas: 1
+    replicas: 1
+    updatedReplicas: 1
+- apiVersion: extensions/v1beta1
+  kind: DaemonSet
+  metadata:
+    annotations:
+      field.cattle.io/creatorId: user-pqsxq
+    creationTimestamp: 2019-05-24T05:32:29Z
+    generation: 3
+    labels:
+      cattle.io/creator: norman
+      workload.user.cattle.io/workloadselector: daemonSet-elk-fluent-bit
+    name: fluent-bit
+    namespace: elk
+    resourceVersion: "982860"
+    selfLink: /apis/extensions/v1beta1/namespaces/elk/daemonsets/fluent-bit
+    uid: 523afc99-7de5-11e9-a691-005056b887a4
+  spec:
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        workload.user.cattle.io/workloadselector: daemonSet-elk-fluent-bit
+    template:
+      metadata:
+        annotations:
+          cattle.io/timestamp: 2019-05-24T05:47:34Z
+        creationTimestamp: null
+        labels:
+          workload.user.cattle.io/workloadselector: daemonSet-elk-fluent-bit
+      spec:
+        containers:
+        - image: fluent/fluent-bit:1.1.1
+          imagePullPolicy: Always
+          name: fluent-bit
+          resources: {}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {}
+            privileged: false
+            procMount: Default
+            readOnlyRootFilesystem: false
+            runAsNonRoot: false
+          stdin: true
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          tty: true
+          volumeMounts:
+          - mountPath: /var/log
+            name: varlog
+          - mountPath: /var/lib/docker/containers
+            name: varlibdockercontainers
+          - mountPath: /fluent-bit/etc/fluent-bit.conf
+            name: config
+            subPath: fluent-bit.conf
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext: {}
+        terminationGracePeriodSeconds: 30
+        volumes:
+        - hostPath:
+            path: /var/log
+            type: ""
+          name: varlog
+        - hostPath:
+            path: /var/lib/docker/containers
+            type: ""
+          name: varlibdockercontainers
+        - configMap:
+            defaultMode: 420
+            name: fluent-bit-config
+            optional: true
+          name: config
+    templateGeneration: 3
+    updateStrategy:
+      rollingUpdate:
+        maxUnavailable: 1
+      type: RollingUpdate
+  status:
+    currentNumberScheduled: 4
+    desiredNumberScheduled: 4
+    numberAvailable: 4
+    numberMisscheduled: 0
+    numberReady: 4
+    observedGeneration: 3
+    updatedNumberScheduled: 4
+- apiVersion: apps/v1beta1
+  kind: StatefulSet
+  metadata:
+    annotations:
+      field.cattle.io/creatorId: user-pqsxq
+      field.cattle.io/publicEndpoints: '[{"addresses":["172.23.43.15"],"port":32425,"protocol":"TCP","serviceName":"elk:elasticsearch-nodeport","allNodes":true},{"addresses":["172.23.43.15"],"port":30923,"protocol":"TCP","serviceName":"elk:elasticsearch-nodeport","allNodes":true}]'
+    creationTimestamp: 2019-05-24T02:44:02Z
+    generation: 8
+    labels:
+      cattle.io/creator: norman
+      workload.user.cattle.io/workloadselector: statefulSet-elk-elasticsearch
+    name: elasticsearch
+    namespace: elk
+    resourceVersion: "978631"
+    selfLink: /apis/apps/v1beta1/namespaces/elk/statefulsets/elasticsearch
+    uid: ca2ac03b-7dcd-11e9-a691-005056b887a4
+  spec:
+    podManagementPolicy: OrderedReady
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        workload.user.cattle.io/workloadselector: statefulSet-elk-elasticsearch
+    serviceName: elasticsearch
+    template:
+      metadata:
+        annotations:
+          cattle.io/timestamp: 2019-05-24T05:10:51Z
+          field.cattle.io/ports: '[[{"containerPort":9200,"dnsName":"elasticsearch-nodeport","kind":"NodePort","name":"9200tcp01","protocol":"TCP","sourcePort":0},{"containerPort":9300,"dnsName":"elasticsearch-nodeport","kind":"NodePort","name":"9300tcp01","protocol":"TCP","sourcePort":0}]]'
+        creationTimestamp: null
+        labels:
+          workload.user.cattle.io/workloadselector: statefulSet-elk-elasticsearch
+      spec:
+        containers:
+        - env:
+          - name: cluster.initial_master_nodes
+            value: elasticsearch
+          - name: cluster.name
+            value: elk-cluster
+          - name: discovery.seed_hosts
+            value: elasticsearch
+          - name: node.name
+            value: elasticsearch
+          image: docker.elastic.co/elasticsearch/elasticsearch:7.1.0
+          imagePullPolicy: Always
+          name: elasticsearch
+          ports:
+          - containerPort: 9200
+            name: 9200tcp01
+            protocol: TCP
+          - containerPort: 9300
+            name: 9300tcp01
+            protocol: TCP
+          resources: {}
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
+            procMount: Default
+            readOnlyRootFilesystem: false
+            runAsNonRoot: false
+          stdin: true
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          tty: true
+          volumeMounts:
+          - mountPath: /usr/share/elasticsearch/data
+            name: esdata
+        dnsConfig: {}
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext: {}
+        terminationGracePeriodSeconds: 30
+        volumes:
+        - emptyDir: {}
+          name: esdata
+    updateStrategy:
+      type: RollingUpdate
+  status:
+    collisionCount: 0
+    currentReplicas: 1
+    currentRevision: elasticsearch-6dbcf9b8f4
+    observedGeneration: 8
+    readyReplicas: 1
+    replicas: 1
+    updateRevision: elasticsearch-6dbcf9b8f4
+    updatedReplicas: 1
+- apiVersion: apps/v1beta1
+  kind: StatefulSet
+  metadata:
+    annotations:
+      field.cattle.io/creatorId: user-pqsxq
+    creationTimestamp: 2019-05-24T03:58:36Z
+    generation: 6
+    labels:
+      cattle.io/creator: norman
+      workload.user.cattle.io/workloadselector: statefulSet-elk-es
+    name: es
+    namespace: elk
+    resourceVersion: "979889"
+    selfLink: /apis/apps/v1beta1/namespaces/elk/statefulsets/es
+    uid: 34af38bd-7dd8-11e9-a691-005056b887a4
+  spec:
+    podManagementPolicy: OrderedReady
+    replicas: 4
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        workload.user.cattle.io/workloadselector: statefulSet-elk-es
+    serviceName: es2
+    template:
+      metadata:
+        annotations:
+          cattle.io/timestamp: 2019-05-24T05:15:14Z
+        creationTimestamp: null
+        labels:
+          workload.user.cattle.io/workloadselector: statefulSet-elk-es
+      spec:
+        containers:
+        - env:
+          - name: cluster.initial_master_nodes
+            value: elasticsearch
+          - name: cluster.name
+            value: elk-cluster
+          - name: discovery.seed_hosts
+            value: elasticsearch
+          image: docker.elastic.co/elasticsearch/elasticsearch:7.1.0
+          imagePullPolicy: Always
+          name: es
+          resources: {}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {}
+            privileged: false
+            procMount: Default
+            readOnlyRootFilesystem: false
+            runAsNonRoot: false
+          stdin: true
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          tty: true
+          volumeMounts:
+          - mountPath: /usr/share/elasticsearch/data
+            name: esdata
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext: {}
+        terminationGracePeriodSeconds: 30
+        volumes:
+        - emptyDir: {}
+          name: esdata
+    updateStrategy:
+      type: RollingUpdate
+  status:
+    collisionCount: 0
+    currentReplicas: 4
+    currentRevision: es-79c7dbc8ff
+    observedGeneration: 6
+    readyReplicas: 4
+    replicas: 4
+    updateRevision: es-79c7dbc8ff
+    updatedReplicas: 4
+kind: List
+

@@ -77,6 +77,7 @@ def fetch(is_all=False):
                 continue
 
             tname = fname[:-9]
+            fpath = os.path.join(today_dir, fname)
 
             print(fname, tname)
 
@@ -89,7 +90,6 @@ def fetch(is_all=False):
                 print('exists!')
                 continue
 
-            fpath = os.path.join(today_dir, fname)
             lines = open(fpath).readlines()
             counter = 0
 
@@ -152,6 +152,11 @@ def fetch(is_all=False):
             total_counter += counter
 
         print('upload to mysql success!')
+
+        for fname in os.listdir(today_dir):
+            fpath = os.path.join(today_dir, fname)
+            os.remove(fpath)
+        print('remove temp files finish!')
 
     sftp.close()
     client.close()
