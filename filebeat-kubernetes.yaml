@@ -32,7 +32,7 @@ data:
     cloud.auth: ${ELASTIC_CLOUD_AUTH}
 
     output.redis:
-      hosts: ["redis:6379"]
+      hosts: ["redis.elk:6379"]
       db: 2
       timeout: 10
       key: "filebeat"
