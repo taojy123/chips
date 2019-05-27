@@ -1,0 +1,33 @@
+# ...
+      volumes:
+      # 临时空目录 (在同一 Pod 内的不同容器之间共享工作过程中产生的文件)
+      - emptyDir: {}
+        name: es-data
+      # 主机映射
+      - hostPath:
+          path: /var/log                # 宿主机路径
+          type: ""
+        name: varlog
+      # 映射配置
+      - configMap:
+          defaultMode: 420
+          name: efk-fluent-bit-config   # 配置项名称
+        name: config
+      # 加密配置
+      - name: sconfig
+        secret:
+          secretName: mysecret-config
+# ...
+      containers:
+        volumeMounts:
+        - mountPath: /usr/share/elasticsearch/data
+          name: es-data
+        - mountPath: /var/log           # 容器中的路径
+          name: varlog
+        - mountPath: /fluent-bit/etc/fluent-bit.conf  
+          name: config
+          subPath: fluent-bit.conf      # efk-fluent-bit-config 中的 key
+        - mountPath: /etc/secret                      
+          name: sconfig                 # 不设定 subPath 则 mysecret-config 下的所有 key 各种作为文件名添加到 /etc/secret 中
+# ...
+
