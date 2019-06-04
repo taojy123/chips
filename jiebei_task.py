@@ -9,7 +9,7 @@ import hashlib
 from celery import Celery
 
 
-SECRET_FIELDS = ['cert_no']
+SECRET_FIELDS = ['cert_no', 'id_card']
 
 
 app = Celery('jiebei')
@@ -45,7 +45,7 @@ def fetch(is_all=False):
 
         checkpoint_filename = '/usr/local/data/checkpoint/jiebei/%s.tar.Z' % today
         sftp.get('./kunlunjiebei/%s/%s.tar.Z' % (today, today), checkpoint_filename)
-        cmd = 'python /home/taojiayuan/workspace/clam/clam.py --encrypt --in %s --key=/root/abc.txt' % checkpoint_filename
+        cmd = 'python /home/taojiayuan/workspace/clam/clam.py --encrypt --in %s --key=/root/jiebei.txt' % checkpoint_filename
         os.system(cmd)
         os.remove(checkpoint_filename)
 
@@ -67,17 +67,28 @@ def fetch(is_all=False):
 
         for fname in os.listdir(today_dir):
 
-            if fname.startswith('check_'):
-                continue
-
-            if '_' not in fname:
-                continue
-
-            if '.' in fname:
-                continue
-
-            tname = fname[:-9]
             fpath = os.path.join(today_dir, fname)
+
+            # hard code for 贷前数据
+            if fname.endswith('.a'):
+                pre_flag = True
+                if fname.startswith('check_accounting'):
+                    tname = 'jb_join_key'
+                elif fname.startswith('check_arg_status_change'):
+                    tname = 'jb_verify_first'
+                elif fname.startswith('check_daily_balance'):
+                    tname = 'jb_verify_final'
+                else:
+                    assert False, ('贷前数据 未找到对应表', fname)
+            else:
+                pre_flag = False
+                if fname.startswith('check_'):
+                    continue
+                if '.' in fname:
+                    continue
+                if '_' not in fname:
+                    continue
+                tname = fname[:-9]
 
             print(fname, tname)
 
@@ -90,7 +101,16 @@ def fetch(is_all=False):
                 print('exists!')
                 continue
 
-            lines = open(fpath).readlines()
+            try:
+                lines = open(fpath).readlines()
+            except Exception as e:
+                print(fpath, 'try encoding by gbk')
+                lines = open(fpath, encoding='gbk').readlines()
+            
+            # hard code for jb_join_key
+            if tname == 'jb_join_key':
+                lines = ['id_card,apply_no'] + lines
+
             counter = 0
 
             if tname == 'accounting':
@@ -115,7 +135,15 @@ def fetch(is_all=False):
 
             else:
 
-                fields = lines[0].strip().split(',')
+                first_line = lines[0]
+
+                # hard code for 贷前数据
+                if tname == 'jb_verify_first':
+                    first_line = 'id,create_date,create_user,update_date,update_user,version,bank_code,inst_code,id_card,risk_score,risk_warn,risk_level,fico_score,first_reason,first_credit_limit,first_credit_rate,first_result,rule_random,credit_random,refuse_code,refuse_reason,rs_result,zm_authflag,zm_has_jbadmit,zm_score,zm_curr_address,zm_is_matched,zm_auth_flag,home_code,birthday,gender'
+                elif tname == 'jb_verify_final':
+                    first_line = 'id,create_date,create_user,update_date,update_user,version,bank_code,inst_code,apply_no,credit_limit,credit_rate,jb_credit_limit,jb_credit_rate,result_'
+
+                fields = first_line.strip().split(',')
                 fieldstr = ', '.join(fields)
 
                 secret_indexs = []
@@ -131,6 +159,16 @@ def fetch(is_all=False):
                         continue
 
                     values = line.split(',')
+
+                    # hard code for 贷前数据
+                    if pre_flag:
+                        values = line.strip('"').split('","')
+
+                    # hard code for jb_join_key
+                    if tname == 'jb_join_key':
+                        values = line.split('\t')
+                        if len(values) != 2:
+                            continue
 
                     for secret_index in secret_indexs:
                         value = values[secret_index]
